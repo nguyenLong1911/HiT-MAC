@@ -1,0 +1,6 @@
+name: hitmac
+channels:
+  - defaults
+dependencies:
+  - python=3.11.14
+prefix: /mnt/d/miniconda3_wsl/envs/hitmac

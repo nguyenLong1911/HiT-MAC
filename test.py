@@ -45,6 +45,9 @@ def test(args, shared_model, optimizer, train_modes, n_iters):
     player.model = build_model(player.env.observation_space, player.env.action_space, args, device).to(device)
     player.model.eval()
     max_score = -100
+    
+    ave_coverage_rate = 0
+    acr_count = 0
 
     while True:
         AG = 0
@@ -73,8 +76,11 @@ def test(args, shared_model, optimizer, train_modes, n_iters):
                     len_sum += player.eps_len
                     fps = fps_counter / (time.time()-t0)
                     n_iter = 0
-                    for n in n_iters:
-                        n_iter += n
+                    # if len(n_iters) > 0:
+                    #     for n in n_iters:
+                    #         n_iter += n
+                    # else:
+                    #     n_iter += count_eps
 
                     for i, r_i in enumerate(reward_sum_ep):
                         writer.add_scalar('test/reward'+str(i), r_i, n_iter)
@@ -82,6 +88,10 @@ def test(args, shared_model, optimizer, train_modes, n_iters):
                     fps_all.append(fps)
                     writer.add_scalar('test/fps', fps, n_iter)
                     writer.add_scalar('test/eps_len', player.eps_len, n_iter)
+                    
+                    acr_count += 1
+                    ave_coverage_rate = (ave_coverage_rate * (acr_count - 1) + player.info['Coverage_rate']) / (acr_count)
+                    writer.add_scalar('test/ave_coverage_rate', ave_coverage_rate, time.time() - start_time)
                     break
 
         # player.max_length:
@@ -94,12 +104,12 @@ def test(args, shared_model, optimizer, train_modes, n_iters):
 
         log['{}_log'.format(args.env)].info(
             "Time {0}, ave eps reward {1}, ave eps length {2}, reward step {3}, FPS {4}, "
-            "mean reward {5}, std reward {6}, AG {7}".
+            "mean reward {5}, std reward {6}, AG {7}, coverage_rate {8}".
             format(
                 time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - start_time)),
                 np.around(ave_reward_sum, decimals=2), np.around(len_mean, decimals=2),
                 np.around(reward_step, decimals=2), np.around(np.mean(fps_all), decimals=2),
-                mean_reward, std_reward, np.around(ave_AG, decimals=2)
+                mean_reward, std_reward, np.around(ave_AG, decimals=2), player.info['Coverage_rate']
             ))
 
         # save model
@@ -114,6 +124,7 @@ def test(args, shared_model, optimizer, train_modes, n_iters):
         torch.save(state_to_save, model_dir)
 
         time.sleep(args.sleep_time)
+        print("n_iter: ", n_iter)
         if n_iter > args.max_step:
             env.close()
             for id in range(0, args.workers):
